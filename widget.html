@@ -19,24 +19,24 @@
   }
   #panel{
     max-width:100%;max-height:100%;object-fit:contain;
-    transition:opacity .18s ease,transform .18s ease;
+    transition:opacity .15s ease;
   }
-  #stage.swap #panel{opacity:0;transform:scale(.98)}
-  #redraw{
-    position:absolute;right:12px;bottom:12px;
-    border:none;border-radius:999px;padding:9px 16px;
-    font-size:13px;font-weight:700;font-family:inherit;
-    background:rgba(0,0,0,.74);color:#fff;cursor:pointer;
-  }
-  #redraw:hover{background:#000}
+  #panel.dim{opacity:.4}
   #msg{position:absolute;font-size:13px;color:#9a9a9a}
+  #tag{
+    position:absolute;left:10px;bottom:9px;
+    font-size:10px;letter-spacing:.04em;
+    font-variant-numeric:tabular-nums;
+    color:#1a1a1a;opacity:.3;
+    pointer-events:none;user-select:none;
+  }
 </style>
 </head>
 <body>
 <div id="stage" title="クリックで引き直し">
-  <img id="panel" alt="漫画の1コマ" draggable="false">
-  <button id="redraw" type="button">引き直す</button>
-  <div id="msg">読み込み中…</div>
+  <img id="panel" alt="" draggable="false">
+  <div id="tag"></div>
+  <div id="msg"></div>
 </div>
 <script>
 (function(){
@@ -46,9 +46,9 @@
 
   var stage=document.getElementById("stage"),
       img=document.getElementById("panel"),
-      btn=document.getElementById("redraw"),
       msg=document.getElementById("msg"),
-      panels=[],last=-1,nextSrc=null;
+      tag=document.getElementById("tag"),
+      panels=[],last=-1,reqId=0;
 
   function pick(){
     var i=Math.floor(Math.random()*panels.length);
@@ -56,30 +56,33 @@
     last=i;
     return BASE+panels[i];
   }
-  function preload(){nextSrc=pick();var p=new Image();p.src=nextSrc;}
+  function setTag(src){
+    var m=src.match(/nice_(\d+)_(\d+)/);
+    tag.textContent=m?(parseInt(m[1],10)+"-"+m[2]):"";
+  }
+  function show(src){
+    img.src=src;
+    setTag(src);
+    requestAnimationFrame(function(){img.classList.remove("dim");});
+  }
   function draw(){
     if(!panels.length)return;
-    var src=nextSrc||pick();
-    stage.classList.add("swap");
-    setTimeout(function(){
-      img.src=src;
-      requestAnimationFrame(function(){stage.classList.remove("swap");});
-      preload();
-    },180);
+    var src=pick();                // クリックのたびにその場で抽選
+    var id=++reqId;                // 連打対策: 最新のクリックだけ反映
+    img.classList.add("dim");      // 即座に薄く = 切り替え中の合図
+    var im=new Image();
+    im.onload=im.onerror=function(){ if(id===reqId)show(src); };
+    im.src=src;
   }
 
   stage.addEventListener("click",draw);
-  btn.addEventListener("click",function(e){e.stopPropagation();draw();});
 
   fetch(BASE+"manifest.json",{cache:"no-cache"})
     .then(function(r){if(!r.ok)throw 0;return r.json();})
     .then(function(m){
       panels=m.panels||[];
       if(!panels.length)throw 0;
-      msg.style.display="none";
-      nextSrc=pick();
-      img.src=nextSrc;
-      img.onload=preload;
+      draw();
     })
     .catch(function(){msg.textContent="読み込めませんでした(BASE_URL を確認してください)";});
 })();
